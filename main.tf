@@ -4,7 +4,7 @@ data "aws_ami" "app_ami" {
 
   filter {
     name   = "name"
-    values = ["bitnami-tomcat-*-x86_64-hvm-ebs-nami"]
+    values = var.ami_filter.name
   }
 
   filter {
@@ -12,7 +12,7 @@ data "aws_ami" "app_ami" {
     values = ["hvm"]
   }
 
-  owners = ["979382823631"] # Bitnami
+  owners = [var.ami_filter.owner] # Bitnami
 }
 
 
@@ -24,24 +24,24 @@ data "aws_ami" "app_ami" {
 module "blog_vpc" {
   source = "terraform-aws-modules/vpc/aws"
 
-  name = "dev"
-  cidr = "10.0.0.0/16"
+  name = var.env.name
+  cidr = "${var.env.network_prefix}.0.0/16"
 
   azs             = ["us-west-2a", "us-west-2b", "us-west-2c"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  public_subnets  = ["${var.env.network_prefix}.101.0/24", "${var.env.network_prefix}.102.0/24", "${var.env.network_prefix}.103.0/24"]
 
   enable_nat_gateway = true
 
   tags = {
     Terraform = "true"
-    Environment = "dev"
+    Environment = var.env.name
   }
 }
 
 module "blog_sg" {
   source  = "terraform-aws-modules/security-group/aws"
   version = "4.17.1"
-  name = "blog_new"
+  name = "${var.env.name}-blog"
 
   vpc_id = module.blog_vpc.vpc_id
 
@@ -66,7 +66,7 @@ module "blog_alb" {
 
   target_groups = [
     {
-      name_prefix      = "blog"
+      name_prefix      = "${var.env.name}-"
       backend_protocol = "HTTP"
       backend_port     = 80
       target_type      = "instance"
@@ -82,7 +82,7 @@ module "blog_alb" {
   ]
 
   tags = {
-    Environment = "dev"
+    Environment = var.env.name
   }
 }
 
@@ -91,12 +91,12 @@ module "autoscaling" {
   version = "6.7.1"
   name = "blog"
 
-  min_size = 1
-  max_size = 2
+  min_size = var.min_size
+  max_size = var.max_size
   vpc_zone_identifier = module.blog_vpc.public_subnets
   target_group_arns   = module.blog_alb.target_group_arns
   security_groups     = [module.blog_sg.security_group_id]
-  image_id                 = data.aws_ami.app_ami.id
+  image_id            = data.aws_ami.app_ami.id
   instance_type       = var.instance_type
 }
 
