@@ -1,3 +1,3 @@
 output "env_url" {
-  value = module.blog_alg.lb_dns_name
+  value = module.blog_alb.lb_dns_name
 }
